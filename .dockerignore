@@ -3,5 +3,4 @@ dist
 .env
 .git
 .gitignore
-firebase-applet-config.json
 metadata.json
