@@ -4,7 +4,7 @@ import { createServer as createViteServer } from "vite";
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  const PORT = parseInt(process.env.PORT || "3000", 10);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
