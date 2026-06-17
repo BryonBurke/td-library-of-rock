@@ -1,0 +1,88 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the Library of Rock application, can be a student or moderator.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "moderator"] },
+        "createdAt": { "type": "number", "description": "Timestamp" }
+      },
+      "required": ["email", "role", "createdAt"]
+    },
+    "PracticeSession": {
+      "title": "Practice Session",
+      "description": "A practice session logged by a student.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "dateString": { "type": "string", "description": "YYYY-MM-DD format for easy querying by day" },
+        "durationMinutes": { "type": "number" },
+        "createdAt": { "type": "number", "description": "Timestamp" }
+      },
+      "required": ["userId", "dateString", "durationMinutes", "createdAt"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "An announcement posted by a moderator.",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "number", "description": "Timestamp" }
+      },
+      "required": ["authorId", "content", "createdAt"]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "A message sent in the global chat.",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "number", "description": "Timestamp" }
+      },
+      "required": ["authorId", "authorName", "content", "createdAt"]
+    },
+    "WorkHour": {
+      "title": "Work Hour",
+      "description": "Time tracked by the moderator.",
+      "type": "object",
+      "properties": {
+        "moderatorId": { "type": "string" },
+        "category": { "type": "string", "enum": ["class_time", "prep_time", "other"] },
+        "durationMinutes": { "type": "number" },
+        "dateString": { "type": "string", "description": "YYYY-MM-DD" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "number", "description": "Timestamp" }
+      },
+      "required": ["moderatorId", "category", "durationMinutes", "dateString", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles."
+    },
+    "practice_sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/PracticeSession" },
+      "description": "Stores practice sessions."
+    },
+    "announcements/{announcementId}": {
+      "schema": { "$ref": "#/entities/Announcement" },
+      "description": "Global announcements."
+    },
+    "chat_messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Main global chat."
+    },
+    "work_hours/{hourId}": {
+      "schema": { "$ref": "#/entities/WorkHour" },
+      "description": "Moderator logged hours."
+    }
+  }
+}

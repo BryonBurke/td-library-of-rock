@@ -1,0 +1,34 @@
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Anton", sans-serif;
+  
+  --color-primary: #FF2A00;
+  --color-dark: #09090B;
+  --color-panel: #18181B;
+  --color-border: #27272A;
+}
+
+body {
+  background-color: var(--color-dark);
+  color: #FAFAFA;
+  font-family: var(--font-sans);
+}
+
+.brutal-border {
+  border: 2px solid #27272A;
+}
+
+.brutal-border-accent {
+  border: 2px solid var(--color-primary);
+}
+
+.glass-panel {
+  background: rgba(24, 24, 27, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border);
+}
+

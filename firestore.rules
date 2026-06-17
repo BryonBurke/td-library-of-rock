@@ -1,0 +1,138 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Primitives
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return request.auth.token.email_verified == true; }
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    function isOwner(userId) { return request.auth.uid == userId; }
+    
+    // Bootstrapped Admin & Role verification
+    function isBootstrappedAdmin() {
+      return isSignedIn() && request.auth.token.email == 'bryonparis@gmail.com';
+    }
+    
+    function isModerator() {
+      return isSignedIn() && (isBootstrappedAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'moderator'));
+    }
+
+    // Phase 2: Schema Validation Helpers
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'role', 'createdAt'])
+        && data.email is string && data.email.size() <= 200
+        && (data.displayName == null || (data.displayName is string && data.displayName.size() <= 100))
+        && data.role in ['student', 'moderator']
+        && data.createdAt is number;
+    }
+
+    function isValidPracticeSession(data) {
+      return data.keys().hasAll(['userId', 'dateString', 'durationMinutes', 'createdAt'])
+        && data.userId is string && data.userId.size() <= 128
+        && data.dateString is string && data.dateString.size() <= 20
+        && data.durationMinutes is number && data.durationMinutes >= 0 && data.durationMinutes <= 1440
+        && data.createdAt is number;
+    }
+
+    function isValidAnnouncement(data) {
+      return data.keys().hasAll(['authorId', 'content', 'createdAt'])
+        && data.authorId is string && data.authorId.size() <= 128
+        && (data.title == null || (data.title is string && data.title.size() <= 200))
+        && data.content is string && data.content.size() <= 5000
+        && data.createdAt is number;
+    }
+
+    function isValidChatMessage(data) {
+      return data.keys().hasAll(['authorId', 'authorName', 'content', 'createdAt'])
+        && data.authorId is string && data.authorId.size() <= 128
+        && data.authorName is string && data.authorName.size() <= 100
+        && data.content is string && data.content.size() <= 1000
+        && data.createdAt is number;
+    }
+
+    function isValidWorkHour(data) {
+      return data.keys().hasAll(['moderatorId', 'category', 'durationMinutes', 'dateString', 'createdAt'])
+        && data.moderatorId is string && data.moderatorId.size() <= 128
+        && data.category in ['class_time', 'prep_time', 'other']
+        && data.durationMinutes is number && data.durationMinutes >= 0 && data.durationMinutes <= 1440
+        && data.dateString is string && data.dateString.size() <= 20
+        && (data.notes == null || (data.notes is string && data.notes.size() <= 1000))
+        && data.createdAt is number;
+    }
+
+    // Collections Phase 4: Fortress Rules
+    
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (isOwner(userId) || isModerator());
+      allow list: if isSignedIn() && isModerator();
+      
+      allow create: if isSignedIn() && isValidId(userId) && isOwner(userId)
+        && isValidUser(incoming())
+        // New users can only set their role to 'student' UNLESS they are the bootstrapped admin
+        && (incoming().role == 'student' || isBootstrappedAdmin());
+        
+      allow update: if isSignedIn() && isValidId(userId) && isValidUser(incoming()) && (
+        // User themselves updating standard info
+        (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName'])) ||
+        // Moderator updating roles
+        (isModerator() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'displayName']))
+      );
+    }
+
+    match /practice_sessions/{sessionId} {
+      allow get: if isSignedIn() && isValidId(sessionId) && (isOwner(existing().userId) || isModerator());
+      allow list: if isSignedIn() && (isOwner(resource.data.userId) || isModerator());
+      
+      allow create: if isSignedIn() && isValidId(sessionId)
+        && isValidPracticeSession(incoming())
+        && isOwner(incoming().userId);
+        
+      // No updates needed for practice sessions based on specs.
+      allow delete: if isSignedIn() && isValidId(sessionId) && (isOwner(existing().userId) || isModerator());
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn(); // All signed-in users can read announcements
+      
+      allow create: if isSignedIn() && isValidId(announcementId) && isModerator()
+        && isValidAnnouncement(incoming())
+        && isOwner(incoming().authorId);
+        
+      allow update: if isSignedIn() && isValidId(announcementId) && isModerator()
+        && isValidAnnouncement(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content'])
+        && incoming().authorId == existing().authorId;
+
+      allow delete: if isSignedIn() && isValidId(announcementId) && isModerator();
+    }
+
+    match /chat_messages/{messageId} {
+      allow read: if isSignedIn(); // All signed in users can read global chat
+      
+      allow create: if isSignedIn() && isValidId(messageId)
+        && isValidChatMessage(incoming())
+        && isOwner(incoming().authorId);
+        
+      allow delete: if isSignedIn() && isValidId(messageId) && (isOwner(existing().authorId) || isModerator());
+    }
+
+    match /work_hours/{hourId} {
+      allow get: if isSignedIn() && isValidId(hourId) && isOwner(existing().moderatorId);
+      allow list: if isSignedIn() && isOwner(resource.data.moderatorId);
+      
+      allow create: if isSignedIn() && isValidId(hourId) && isModerator()
+        && isValidWorkHour(incoming())
+        && isOwner(incoming().moderatorId);
+        
+      allow delete: if isSignedIn() && isValidId(hourId) && isOwner(existing().moderatorId);
+    }
+  }
+}
