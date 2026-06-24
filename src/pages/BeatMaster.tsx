@@ -18,6 +18,7 @@ const PERFECT_THRESHOLD = 40; // ms
 
 export default function BeatMaster() {
   const [bpm, setBpm] = useState(120);
+  const bpmRef = useRef(120);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [calibrationOffset, setCalibrationOffset] = useState(0);
@@ -34,6 +35,30 @@ export default function BeatMaster() {
   
   // Timing analysis refs
   const lastBeatTimestampRef = useRef<number>(0);
+  const bpmIntervalRef = useRef<number | null>(null);
+
+  const startAdjustingBpm = (amount: number) => {
+    if (bpmIntervalRef.current) return;
+    setBpm(prev => {
+      const newBpm = Math.min(280, Math.max(40, prev + amount));
+      bpmRef.current = newBpm;
+      return newBpm;
+    });
+    bpmIntervalRef.current = window.setInterval(() => {
+      setBpm(prev => {
+        const newBpm = Math.min(280, Math.max(40, prev + amount));
+        bpmRef.current = newBpm;
+        return newBpm;
+      });
+    }, 100);
+  };
+
+  const stopAdjustingBpm = () => {
+    if (bpmIntervalRef.current) {
+      window.clearInterval(bpmIntervalRef.current);
+      bpmIntervalRef.current = null;
+    }
+  };
 
   // Initialize Audio Context
   const initAudio = useCallback(() => {
@@ -74,12 +99,12 @@ export default function BeatMaster() {
     while (nextBeatTimeRef.current < audioCtxRef.current.currentTime + 0.1) {
       playClick(nextBeatTimeRef.current);
       
-      const secondsPerBeat = 60.0 / bpm;
+      const secondsPerBeat = 60.0 / bpmRef.current;
       nextBeatTimeRef.current += secondsPerBeat;
       currentBeatRef.current++;
     }
     timerIDRef.current = requestAnimationFrame(scheduler);
-  }, [bpm]);
+  }, []);
 
   const toggleMetronome = () => {
     initAudio();
@@ -91,6 +116,7 @@ export default function BeatMaster() {
       setLastOffset(null);
     } else {
       setIsPlaying(true);
+      setHistory([]);
       currentBeatRef.current = 0;
       nextBeatTimeRef.current = audioCtxRef.current!.currentTime + 0.05;
       scheduler();
@@ -116,9 +142,12 @@ export default function BeatMaster() {
     // Calculate raw offset from the last scheduled beat
     let rawOffset = now - lastBeatTimestampRef.current;
     
-    // If offset is more than half a beat, it's closer to the NEXT beat
+    // Normalize rawOffset to be within [-msPerBeat/2, msPerBeat/2]
+    rawOffset = rawOffset % msPerBeat;
     if (rawOffset > msPerBeat / 2) {
       rawOffset -= msPerBeat;
+    } else if (rawOffset < -msPerBeat / 2) {
+      rawOffset += msPerBeat;
     }
 
     if (isCalibrating) {
@@ -161,6 +190,7 @@ export default function BeatMaster() {
   useEffect(() => {
     return () => {
       if (timerIDRef.current) cancelAnimationFrame(timerIDRef.current);
+      if (bpmIntervalRef.current) window.clearInterval(bpmIntervalRef.current);
     };
   }, []);
 
@@ -194,19 +224,23 @@ export default function BeatMaster() {
             <span className="text-[10px] tracking-[1px] text-[#8E9299] uppercase mb-1">Tempo</span>
             <div className="flex items-center gap-6 sm:gap-8">
               <button 
-                onClick={() => setBpm(Math.max(40, bpm - 1))}
-                className="p-2 hover:bg-[#2A2B30] rounded-full transition-colors active:scale-90"
+                onPointerDown={() => startAdjustingBpm(-1)}
+                onPointerUp={stopAdjustingBpm}
+                onPointerLeave={stopAdjustingBpm}
+                className="p-2 hover:bg-[#2A2B30] rounded-full transition-colors active:scale-90 touch-none"
                 disabled={isCalibrating}
               >
-                <ChevronDown size={20} className="sm:w-6 sm:h-6" />
+                <ChevronDown size={20} className="sm:w-6 sm:h-6 pointer-events-none" />
               </button>
               <span className="text-5xl sm:text-7xl font-bold tabular-nums tracking-tighter">{bpm}</span>
               <button 
-                onClick={() => setBpm(Math.min(280, bpm + 1))}
-                className="p-2 hover:bg-[#2A2B30] rounded-full transition-colors active:scale-90"
+                onPointerDown={() => startAdjustingBpm(1)}
+                onPointerUp={stopAdjustingBpm}
+                onPointerLeave={stopAdjustingBpm}
+                className="p-2 hover:bg-[#2A2B30] rounded-full transition-colors active:scale-90 touch-none"
                 disabled={isCalibrating}
               >
-                <ChevronUp size={20} className="sm:w-6 sm:h-6" />
+                <ChevronUp size={20} className="sm:w-6 sm:h-6 pointer-events-none" />
               </button>
             </div>
             <span className="text-[10px] text-[#8E9299] mt-1 font-bold tracking-widest">BPM</span>
