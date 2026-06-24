@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -112,9 +112,29 @@ export default function Dashboard() {
 
       {/* RIGHT COLUMN: Chat */}
       <section className="glass-panel rounded-2xl brutal-border flex flex-col h-[600px] lg:h-[calc(100vh-8rem)]">
-        <div className="p-4 border-b border-zinc-800 flex items-center gap-2">
-          <MessageSquare className="w-5 h-5 text-primary" />
-          <h2 className="font-display text-2xl uppercase tracking-wider">Green Room Chat</h2>
+        <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-primary" />
+            <h2 className="font-display text-2xl uppercase tracking-wider">Green Room Chat</h2>
+          </div>
+          {userData?.role === 'moderator' && (
+            <button 
+              onClick={async () => {
+                if (!window.confirm("Are you sure you want to delete all chat messages?")) return;
+                try {
+                  const { getDocs, deleteDoc, doc } = await import('firebase/firestore');
+                  const snap = await getDocs(collection(db, 'chat_messages'));
+                  await Promise.all(snap.docs.map(d => deleteDoc(doc(db, 'chat_messages', d.id))));
+                } catch(e) {
+                  console.error(e);
+                  alert("Error clearing chat.");
+                }
+              }}
+              className="text-xs bg-red-500/20 text-red-500 hover:bg-red-500/30 px-3 py-1 rounded-full uppercase tracking-wider font-mono transition-colors"
+            >
+              Clear All
+            </button>
+          )}
         </div>
         
         <div className="flex-1 overflow-y-auto p-4 flex flex-col-reverse space-y-4 space-y-reverse">

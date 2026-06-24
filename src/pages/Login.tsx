@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
+import { doc, setDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { HandMetal } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,6 +10,7 @@ import { Navigate } from 'react-router-dom';
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -34,7 +36,7 @@ export default function Login() {
       setIsForgotPassword(false);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Failed to reset password');
+      setError(err.message || 'Failed to send reset email.');
     } finally {
       setLoading(false);
     }
@@ -48,15 +50,23 @@ export default function Login() {
 
     try {
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        if (name) {
+          await setDoc(doc(db, 'users', userCredential.user.uid), { displayName: name }, { merge: true });
+        }
+        navigate('/');
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        // Wait for AuthContext to create the user doc, then update it with the entered name
+        setTimeout(async () => {
+           await setDoc(doc(db, 'users', userCredential.user.uid), { displayName: name || email.split('@')[0] }, { merge: true });
+        }, 1000);
+        navigate('/');
       }
-      navigate('/');
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/invalid-credential') {
-        setError('Incorrect email/password, or account does not exist. (Did you mean to Sign Up?)');
+        setError('Incorrect email/password. Please try again.');
       } else if (err.code === 'auth/email-already-in-use') {
         setError('Email already in use. Please log in or reset your password.');
       } else {
@@ -88,14 +98,29 @@ export default function Login() {
             </div>
           )}
 
+          {!isForgotPassword && (
+            <div>
+              <label className="block text-xs font-bold tracking-widest uppercase text-zinc-400 mb-2">Your Rockstar Name</label>
+              <input
+                type="text"
+                required={!isLogin}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full bg-black/50 border brutal-border focus:border-primary text-white p-4 font-mono outline-none transition-colors"
+                placeholder=""
+              />
+            </div>
+          )}
+
           <div>
-            <label className="block text-xs font-bold tracking-widest uppercase text-zinc-400 mb-2">Email Address</label>
+            <label className="block text-xs font-bold tracking-widest uppercase text-zinc-400 mb-2">Your Email</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-black/50 border brutal-border focus:border-primary text-white p-4 font-mono outline-none transition-colors"
+              placeholder=""
             />
           </div>
 
@@ -108,6 +133,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-black/50 border brutal-border focus:border-primary text-white p-4 font-mono outline-none transition-colors"
+                placeholder=""
               />
             </div>
           )}
@@ -117,17 +143,21 @@ export default function Login() {
             disabled={loading}
             className="w-full bg-primary text-white font-display text-2xl uppercase tracking-wider p-4 hover:bg-primary/80 transition-colors disabled:opacity-50 mt-4"
           >
-            {loading ? 'Booting Amp...' : isForgotPassword ? 'Reset Password' : (isLogin ? 'Plug In' : 'Sign Up')}
+            {loading ? 'Booting Amp...' : isForgotPassword ? 'Reset Password' : (isLogin ? 'Log In' : 'Make New Account')}
           </button>
           
           <div className="flex flex-col gap-2 mt-2">
             {!isForgotPassword && (
               <button
                 type="button"
-                onClick={() => setIsLogin(!isLogin)}
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setError('');
+                  setMessage('');
+                }}
                 className="text-sm font-mono text-zinc-500 hover:text-white transition-colors"
               >
-                {isLogin ? "DON'T HAVE A BACKSTAGE PASS? SIGN UP" : 'ALREADY HAVE A PASS? LOG IN'}
+                {isLogin ? "DONT HAVE AN ACCOUNT? MAKE NEW ACCOUNT" : 'ALREADY HAVE AN ACCOUNT? LOG IN'}
               </button>
             )}
             

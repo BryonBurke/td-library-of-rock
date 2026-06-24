@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -152,7 +152,7 @@ export default function ModeratorPanel() {
 
   const currentWeekStartStr = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
-  const pastWeeks = Array.from(new Set(allSessions.map(s => getWeekStart(s.dateString))))
+  const pastWeeks = Array.from(new Set<string>(allSessions.map(s => getWeekStart(s.dateString))))
     .filter(w => w !== currentWeekStartStr)
     .sort((a, b) => b.localeCompare(a));
 

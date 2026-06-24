@@ -1,8 +1,9 @@
+import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../firebase';
 
-export const ProtectedRoute = ({ children, requiredRole }: { children: JSX.Element, requiredRole?: 'student' | 'moderator' }) => {
+export const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactElement, requiredRole?: 'student' | 'moderator' }) => {
   const { user, userData, loading } = useAuth();
 
   if (loading) {
